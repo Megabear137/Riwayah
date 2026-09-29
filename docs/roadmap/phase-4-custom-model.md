@@ -95,6 +95,23 @@ Changing the vocabulary resets the output layer, but the pretrained encoder is k
 Rough cost: tens of GPU-hours per full run on a few hundred hours of audio, which
 is tens to a few hundred dollars. Budget for 3–5 full runs.
 
+### Training on a local RTX 3060 (12 GB)
+
+A desktop RTX 3060 (12 GB) can fine-tune a FastConformer, just more slowly. (The laptop
+3060 has only 6 GB, which is too tight for this model size.)
+
+- **Settings that fit in 12 GB:** bf16 mixed precision; batch 4–8 with 2–4 steps of
+  gradient accumulation; maximum clip length 15 s; duration bucketing; and activation
+  checkpointing if you still run out of memory.
+- **Speed:** expect roughly **5–10× slower than an A100**. A run that takes a day on
+  an A100 could take about a week.
+- **Machine:** 32 GB system RAM, audio on an SSD, good cooling, and checkpoints saved
+  every epoch so a multi-day run can resume after an interruption.
+- **Suggested split:** use the 3060 for the whole Phase 3 pipeline (OCR,
+  transcription, alignment), for small test runs, for experiments with smaller model
+  sizes, and for evaluation and export. Rent a cloud GPU only for full runs of the
+  large model, once the setup is proven.
+
 ## 6. Evaluate
 
 Use `training/eval/score.py` from Phase 1, running the **full listener** (tracker +
