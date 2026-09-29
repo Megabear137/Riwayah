@@ -37,13 +37,43 @@ The app always knows **which hadith** the user is reciting. So the problem is
 *"align speech to a known text"*, not *"transcribe arbitrary Arabic."* That changes
 what we need:
 
-1. Run ASR (streaming) → partial Arabic text.
-2. Normalise both sides (strip tashkeel, unify ا/أ/إ/آ, ى/ي, ة/ه, remove tatweel).
-3. Fuzzy-align the partial transcript against the expected hadith words (e.g. a
-   Levenshtein / Needleman-Wunsch alignment over words, or over characters or phonemes
-   for robustness) starting from the current cursor.
+1. Run ASR (streaming) → partial Arabic text **with tashkeel** (or phonemes, see §2a).
+2. **Tracking:** make a stripped copy of both sides (no tashkeel; unify ا/أ/إ/آ,
+   ى/ي, ة/ه; remove tatweel) and fuzzy-align it against the expected hadith words
+   (e.g. a Levenshtein / Needleman-Wunsch alignment over words, or over characters for
+   robustness), starting from the current cursor. This only decides *where the
+   user is*, so it should tolerate tashkeel errors.
+3. **Grading:** for each matched word, compare the full vocalised form (harakat,
+   shadda, sukun, tanween) against the expected form, so tashkeel mistakes count as
+   mistakes.
 4. Reveal matched words; flag a word as a mistake only after N subsequent words match
    past it (avoids false negatives from ASR noise).
+
+### 2a. Grading tashkeel
+
+Tashkeel mistakes (e.g. i'rab errors) count as mistakes, which affects the model and
+the grader:
+
+- **Model output must include tashkeel.** Train on fully vocalised labels with a
+  character vocabulary that includes the diacritics. A better option is to predict
+  *pronunciation* (a phoneme sequence with explicit short vowels), which is what Quran
+  mispronunciation-detection research does.
+- **Compare pronunciation, not spelling.** Generate the expected pronunciation from the
+  vocalised text with rules for hamzat al-wasl, sun letters, and **waqf**: stopping on a
+  sukun at a pause is correct, not a missing case ending. Comparing raw diacritics
+  would flag these as false mistakes.
+- **No language-model help on tashkeel.** Use CTC-style decoding without text biasing
+  or an external LM, otherwise the model "corrects" the user's i'rab to the expected
+  one.
+- **Report confidence.** Short vowels are acoustically subtle, so diacritic errors will
+  always be less reliable than whole-word errors. Grade them separately (e.g. "check
+  this vowel" vs. "wrong word") and consider a strict/lenient setting.
+- **Evaluate separately:** word error rate and diacritic error rate, plus
+  precision/recall on real tashkeel mistakes (teacher corrections in the training
+  videos are a good source).
+- **Labels need consistent full tashkeel.** Many hadith databases are only partly
+  vocalised. Prefer a fully vocalised edition that matches what's shown on screen, and
+  review any gaps filled by an automatic diacritiser (e.g. CAMeL Tools).
 
 Even a mediocre general Arabic model becomes quite usable with this, because we only
 need to answer "did they say roughly the next expected word?" Several open-source Quran
